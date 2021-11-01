@@ -1,0 +1,24 @@
+[
+    {
+        "model": "levelupapi.event",
+        "pk": 1,
+        "fields": {
+            "date": "2021-11-05",
+            "time": "20:00:00",
+            "game": 1,
+            "organizer": 1,
+            "description": "Y'all c'mon and lose against me at Monopoly this Friday night!"
+        }
+    },
+    {
+        "model": "levelupapi.event",
+        "pk": 2,
+        "fields": {
+            "date": "2021-11-06",
+            "time": "19:00:00",
+            "game": 2,
+            "organizer": 1,
+            "description": "Take a Risk at RISK! Prepare to meet thy DOOM!"
+        }
+    }
+]
