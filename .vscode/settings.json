@@ -13,4 +13,5 @@
             "database": "db.sqlite3"
         }
     ],
+    "python.formatting.provider": "autopep8",
 }
