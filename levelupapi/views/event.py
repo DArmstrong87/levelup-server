@@ -4,12 +4,14 @@ from django.core.exceptions import ValidationError
 from rest_framework import status
 from django.http import HttpResponseServerError
 from django.contrib.auth import get_user_model
+from rest_framework.decorators import action
 from rest_framework.viewsets import ViewSet
 from rest_framework.response import Response
 from rest_framework import serializers
 from rest_framework import status
 from levelupapi.models import Event
 from levelupapi.models import Gamer
+
 
 class EventView(ViewSet):
     """Level up events"""
@@ -22,7 +24,7 @@ class EventView(ViewSet):
         """
 
         # Uses the token passed in the `Authorization` header
-        # gamer = Gamer.objects.get(user=request.auth.user)
+        gamer = Gamer.objects.get(user=request.auth.user)
 
         # Try to save the new event to the database, then
         # serialize the event instance as JSON, and send the
@@ -34,9 +36,9 @@ class EventView(ViewSet):
             event = Event.objects.create(
                 date=request.data["date"],
                 time=request.data["time"],
-                event=request.data["event"],
-                organizer=request.data["organizer"],
-                description=request.data["description"]
+                game_id=request.data["gameId"],
+                description=request.data["description"],
+                organizer_id=gamer.id
             )
             serializer = EventSerializer(event, context={'request': request})
             return Response(serializer.data)
@@ -47,8 +49,6 @@ class EventView(ViewSet):
         except ValidationError as ex:
             return Response({"reason": ex.message}, status=status.HTTP_400_BAD_REQUEST)
 
-
-
     def retrieve(self, request, pk=None):
         """Handle GET requests for single event
 
@@ -56,11 +56,6 @@ class EventView(ViewSet):
             Response -- JSON serialized event instance
         """
         try:
-            # `pk` is a parameter to this function, and
-            # Django parses it from the URL route parameter
-            #   http://localhost:8000/events/2
-            #
-            # The `2` at the end of the route becomes `pk`
             event = Event.objects.get(pk=pk)
             serializer = EventSerializer(event, context={'request': request})
             return Response(serializer.data)
@@ -114,31 +109,75 @@ class EventView(ViewSet):
         Returns:
             Response -- JSON serialized list of events
         """
-        # Get all event records from the database
+        # Get the current authenticated user
+        gamer = Gamer.objects.get(user=request.auth.user)
         events = Event.objects.all()
 
-        # Support filtering events by type
-        #    http://localhost:8000/events?type=1
-        #
-        # That URL will retrieve all tabletop events
-        game_type = self.request.query_params.get('type', None)
-        if game_type is not None:
-            events = events.filter(game_type__id=game_type)
+        # Set the `joined` property on every event
+        for event in events:
+            # Check to see if the gamer is in the attendees list on the event
+            event.joined = gamer in event.attendees.all()
+
+        # Support filtering events by game
+        game = self.request.query_params.get('gameId', None)
+        if game is not None:
+            events = events.filter(game__id=type)
 
         serializer = EventSerializer(
             events, many=True, context={'request': request})
         return Response(serializer.data)
+
+    @action(methods=['post', 'delete'], detail=True)
+    def signup(self, request, pk=None):
+        """Managing gamers signing up for events"""
+        # Django uses the `Authorization` header to determine
+        # which user is making the request to sign up
+        gamer = Gamer.objects.get(user=request.auth.user)
+
+        try:
+            # Handle the case if the client specifies a game
+            # that doesn't exist
+            event = Event.objects.get(pk=pk)
+        except Event.DoesNotExist:
+            return Response(
+                {'message': 'Event does not exist.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # A gamer wants to sign up for an event
+        if request.method == "POST":
+            try:
+                # Using the attendees field on the event makes it simple to add a gamer to the event
+                # .add(gamer) will insert into the join table a new row the gamer_id and the event_id
+                event.attendees.add(gamer)
+                return Response({}, status=status.HTTP_201_CREATED)
+            except Exception as ex:
+                return Response({'message': ex.args[0]})
+
+        # User wants to leave a previously joined event
+        elif request.method == "DELETE":
+            try:
+                # The many to many relationship has a .remove method that removes the gamer from the attendees list
+                # The method deletes the row in the join table that has the gamer_id and event_id
+                event.attendees.remove(gamer)
+                return Response(None, status=status.HTTP_204_NO_CONTENT)
+            except Exception as ex:
+                return Response({'message': ex.args[0]})
+
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = get_user_model()
         fields = ['first_name', 'last_name']
 
+
 class GamerSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False)
+
     class Meta:
         model = Gamer
         fields = ['user']
+
 
 class EventSerializer(serializers.ModelSerializer):
     """JSON serializer for events
@@ -147,7 +186,10 @@ class EventSerializer(serializers.ModelSerializer):
         serializer type
     """
     organizer = GamerSerializer(many=False)
+    joined = serializers.BooleanField()
+
     class Meta:
         model = Event
-        fields = ('id', 'date', 'time', 'game', 'organizer', 'description')
+        fields = ('id', 'date', 'time', 'game',
+                  'organizer', 'description', 'joined')
         depth = 1
