@@ -128,6 +128,7 @@ class EventView(ViewSet):
         return Response(serializer.data)
 
     @action(methods=['post', 'delete'], detail=True)
+    # url: /events/pk/signup
     def signup(self, request, pk=None):
         """Managing gamers signing up for events"""
         # Django uses the `Authorization` header to determine
