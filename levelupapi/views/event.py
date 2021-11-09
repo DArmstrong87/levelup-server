@@ -7,10 +7,9 @@ from django.contrib.auth import get_user_model
 from rest_framework.decorators import action
 from rest_framework.viewsets import ViewSet
 from rest_framework.response import Response
-from rest_framework import serializers
-from rest_framework import status
-from levelupapi.models import Event
-from levelupapi.models import Gamer
+from rest_framework import serializers, status
+from django.db.models import Count, Q
+from levelupapi.models import Event, Gamer
 
 
 class EventView(ViewSet):
@@ -112,11 +111,23 @@ class EventView(ViewSet):
         # Get the current authenticated user
         gamer = Gamer.objects.get(user=request.auth.user)
         events = Event.objects.all()
+        # events = Event.objects.annotate(attendees_count=Count('attendees'))
+        events = Event.objects.annotate(
+            attendees_count=Count('attendees'),
+            joined=Count(
+                'attendees',
+                filter=Q(attendees=gamer)
+            )
+        )
+        Event.objects.filter(
+            Q(organizer=gamer) &
+            Q(game__gamer=gamer)
+        )
 
-        # Set the `joined` property on every event
-        for event in events:
-            # Check to see if the gamer is in the attendees list on the event
-            event.joined = gamer in event.attendees.all()
+        # # Set the `joined` property on every event
+        # for event in events:
+        #     # Check to see if the gamer is in the attendees list on the event
+        #     event.joined = gamer in event.attendees.all()
 
         # Support filtering events by game
         game = self.request.query_params.get('gameId', None)
@@ -188,9 +199,10 @@ class EventSerializer(serializers.ModelSerializer):
     """
     organizer = GamerSerializer(many=False)
     joined = serializers.BooleanField(required=False)
-
+    attendees_count = serializers.IntegerField(default=None)
+    
     class Meta:
         model = Event
         fields = ('id', 'date', 'time', 'game',
-                  'organizer', 'description', 'joined')
+                  'organizer', 'description', 'joined', 'attendees_count')
         depth = 1
