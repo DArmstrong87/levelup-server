@@ -68,7 +68,7 @@ class EventView(ViewSet):
         Returns:
             Response -- Empty body with 204 status code
         """
-        # gamer = Gamer.objects.get(user=request.auth.user)
+        gamer = Gamer.objects.get(user=request.auth.user)
 
         # Do mostly the same thing as POST, but instead of
         # creating a new instance of Event, get the event record
@@ -77,7 +77,7 @@ class EventView(ViewSet):
         event.date = request.data["date"]
         event.time = request.data["time"]
         event.game_id = request.data["game_id"]
-        event.organizer_id = request.data["organizer_id"]
+        event.organizer_id = gamer.id
         event.description = request.data["description"]
         event.save()
 
@@ -187,7 +187,7 @@ class EventSerializer(serializers.ModelSerializer):
         serializer type
     """
     organizer = GamerSerializer(many=False)
-    joined = serializers.BooleanField()
+    joined = serializers.BooleanField(required=False)
 
     class Meta:
         model = Event
