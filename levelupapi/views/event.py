@@ -40,7 +40,7 @@ class EventView(ViewSet):
                 organizer_id=gamer.id
             )
             serializer = EventSerializer(event, context={'request': request})
-            return Response(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         # If anything went wrong, catch the exception and
         # send a response with a 400 status code to tell the
@@ -57,7 +57,7 @@ class EventView(ViewSet):
         try:
             event = Event.objects.get(pk=pk)
             serializer = EventSerializer(event, context={'request': request})
-            return Response(serializer.data)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as ex:
             return HttpResponseServerError(ex)
 
@@ -188,7 +188,7 @@ class GamerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Gamer
-        fields = ['user']
+        fields = ['id','user']
 
 
 class EventSerializer(serializers.ModelSerializer):

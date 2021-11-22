@@ -7,5 +7,5 @@ SELECT * FROM levelupapi_game;
 SELECT * FROM levelupapi_event;
 SELECT * FROM levelupapi_eventgamer;
 
-DELETE FROM levelupapi_event
-WHERE id= 6;
+DELETE FROM levelupapi_gametype
+WHERE id > 3;
